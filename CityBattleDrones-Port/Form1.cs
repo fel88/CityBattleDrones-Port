@@ -1,5 +1,6 @@
 using OpenTK;
 using OpenTK.Graphics.OpenGL;
+using OpenTK.Platform.Windows;
 using System;
 using System.Collections.Generic;
 using System.Data.SqlTypes;
@@ -40,7 +41,36 @@ namespace CityBattleDrones_Port
             Controls.Add(gl);
         }
 
+        // Skybox texture grid s&t coordinates (5x4 grid lines)
+        // Example: st12 represents the intersection of vertical line 1 and horizontal line 2
+        // in a zero-indexed grid
+        static Vector2d st10 = new Vector2d(0.25, 0);
+        static Vector2d st20 = new Vector2d(0.5, 0);
 
+        static Vector2d st01 = new Vector2d(0, 0.334);
+        static Vector2d st11 = new Vector2d(0.25, 0.334);
+        static Vector2d st21 = new Vector2d(0.5, 0.334);
+        static Vector2d st31 = new Vector2d(0.75, 0.334);
+        static Vector2d st41 = new Vector2d(1, 0.334);
+
+        static Vector2d st02 = new Vector2d(0, 0.666);
+        static Vector2d st12 = new Vector2d(0.25, 0.666);
+        static Vector2d st22 = new Vector2d(0.5, 0.666);
+        static Vector2d st32 = new Vector2d(0.75, 0.666);
+        static Vector2d st42 = new Vector2d(1, 0.666);
+
+        static Vector2d st13 = new Vector2d(0.25, 1);
+        static Vector2d st23 = new Vector2d(0.5, 1);
+
+        // Skybox texture coordinates
+        static Vector2d[] stSkyTopCoords = new Vector2d[] { st12, st13, st23, st22 };
+        static Vector2d[] stSkyBottomCoords = new Vector2d[] { st21, st20, st10, st11 };
+        static Vector2d[][] stSkySideCoords = new Vector2d[][]{
+          new  Vector2d[]  { st11, st12, st22, st21},
+                           new  Vector2d[]                       { st01, st02, st12, st11},
+                                                new  Vector2d[]  { st31, st32, st42, st41},
+                                                new  Vector2d[]  { st21, st22, st32, st31}
+        };
 
 
         int windowWidth = 1200;
@@ -51,6 +81,18 @@ namespace CityBattleDrones_Port
         const int worldSize = 300;            // Size of the world, used for the skybox
         const double tpViewportRatio = 0.7; // Window Width Ratio for the third-person viewport
 
+        //Boundaries of the city viewport
+        static double cityViewportX;
+        static double cityViewportY;
+        static double cityViewportWidth;
+        static double cityViewportHeight;
+
+        //Boundaries of the first-person viewport
+        static double fpViewportX;
+        static double fpViewportY;
+        static double fpViewportWidth;
+        static double fpViewportHeight;
+    
         //Initialize a drone object
         static Vector3d playerSpawnPoint = new Vector3d(0.0, 4.0, -3.0);
         static Vector3d enemySpawnPoint = new Vector3d(0.0, 4.0, 4.0);
@@ -82,8 +124,29 @@ namespace CityBattleDrones_Port
         static float[] light_specular = { 1.0f, 0.9f, 0.7f, 1.0f };
         static float[] light_ambient = { 0.95F, 0.8F, 0.6F, 1.0F };
 
-        // Set up OpenGL. For viewport and projection setup see reshape(). */
-        void initOpenGL(int w, int h)
+
+        // Callback, called at initialization and whenever user resizes the window.
+        void reshape(int w, int h)
+        {
+            windowWidth = w;
+            windowHeight = h;
+            float padding = 5;
+
+            //Boundaries of the city viewport
+            cityViewportX = windowWidth * tpViewportRatio + padding;
+            cityViewportY = 0;
+            cityViewportWidth = windowWidth - cityViewportX;
+            cityViewportHeight = windowHeight * 0.5 - padding / 2.0;
+
+
+            //Boundaries of the first-person viewport
+            fpViewportX = windowWidth * tpViewportRatio + padding;
+            fpViewportY = cityViewportHeight + padding;
+            fpViewportWidth = windowWidth - fpViewportX;
+            fpViewportHeight = windowHeight * 0.5 - padding / 2.0;
+        }
+
+        void defaultSetup()
         {
             // Set up and enable lighting
             GL.Light(LightName.Light0, LightParameter.Ambient, light_ambient);
@@ -104,6 +167,11 @@ namespace CityBattleDrones_Port
 
             GL.Enable(EnableCap.CullFace);
             GL.CullFace(CullFaceMode.Back);
+        }
+        // Set up OpenGL. For viewport and projection setup see reshape(). */
+        void initOpenGL(int w, int h)
+        {
+            defaultSetup();
 
             //Load textures
             texFiles.Add("Textures/cityGround2.bmp");      //2000
@@ -183,6 +251,8 @@ namespace CityBattleDrones_Port
         // or glutPostRedisplay() has been called.
         void display()
         {
+            defaultSetup();
+            
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             for (int j = 0; j < dronePlayer.missiles.Count; j++)
@@ -212,40 +282,62 @@ namespace CityBattleDrones_Port
             fpCamera.setAzimuth(dronePlayer.getRotationY());
             fpCamera.update();
 
-            //GL.Viewport(0, 0, (GLsizei)windowWidth * tpViewportRatio, (GLsizei)windowHeight);
-            //GL.MatrixMode(MatrixMode.Projection);
-            //GL.LoadIdentity();
-            //GL.Perspective(60.0, (GLdouble)(windowWidth * tpViewportRatio / windowHeight), 0.01, 400.0);
-            //GL.MatrixMode(GL_MODELVIEW);
-            //GL.LoadIdentity();
-            //gluLookAt(tpCamera.position.x, tpCamera.position.y, tpCamera.position.z, tpCamera.focus.x, tpCamera.focus.y, tpCamera.focus.z, 0, 1, 0);
-            //glLightfv(GL_LIGHT0, GL_POSITION, light_position0);
+            GL.Viewport(0, 0, (int)(windowWidth * tpViewportRatio), windowHeight);
+            GL.MatrixMode(MatrixMode.Projection);
+            GL.LoadIdentity();
+            var pp = Matrix4d.CreatePerspectiveFieldOfView(Helpers.ToRadians( 60.0), (windowWidth * tpViewportRatio / windowHeight), 0.01, 400.0);
+            GL.LoadMatrix(ref pp);
+
+            GL.MatrixMode(MatrixMode.Modelview);
+            GL.LoadIdentity();
+            pp = Matrix4d.LookAt(tpCamera.position.X, tpCamera.position.Y, tpCamera.position.Z, tpCamera.focus.X, tpCamera.focus.Y, tpCamera.focus.Z, 0, 1, 0);
+            GL.LoadMatrix(ref pp);
+
+
+            GL.Light(LightName.Light0, LightParameter.Position, light_position0);
 
             //glUniform1i(texMapLocation, 0);
             //glUniform1i(texModeLocation, 0);
-            //drawAssets();
+            drawAssets();
 
-            //glViewport(fpViewportX, fpViewportY, (GLsizei)fpViewportWidth, (GLsizei)fpViewportHeight);
-            //glMatrixMode(GL_PROJECTION);
-            //glLoadIdentity();
-            //gluPerspective(60.0, (GLdouble)(fpViewportWidth / fpViewportHeight), 0.005, 400.0);
-            //GL.MatrixMode(MatrixMode.Modelview);
-            //GL.LoadIdentity();
+            GL.Viewport((int)fpViewportX, (int)fpViewportY, (int)fpViewportWidth, (int)fpViewportHeight);
+            GL.MatrixMode(MatrixMode.Projection);
+            GL.LoadIdentity();
+
+            pp = Matrix4d.CreatePerspectiveFieldOfView(Helpers.ToRadians( 60.0),
+                (fpViewportWidth  / fpViewportHeight), 0.005, 400.0);
+             GL.LoadMatrix(ref pp);
+
+            GL.MatrixMode(MatrixMode.Modelview);
+            GL.LoadIdentity();
+             GL.LoadMatrix(ref pp);
+
             //float invertedY = fpCamera.focus.y - (fpCamera.position.y - fpCamera.focus.y);
             //GL.LookAt(fpCamera.focus.x, fpCamera.focus.y, fpCamera.focus.z, fpCamera.position.x, invertedY, fpCamera.position.z, 0, 1, 0);
             //GL.Light(GL_LIGHT0, GL_POSITION, light_position0);
 
             //glUniform1i(spotlightModeLocation, 1);
-            //drawAssets();
+            drawAssets();
             //glUniform1i(spotlightModeLocation, 0);
 
-            //glViewport(cityViewportX, cityViewportY, (GLsizei)cityViewportWidth, (GLsizei)cityViewportHeight);
-            //glMatrixMode(GL_PROJECTION);
-            //glLoadIdentity();
+            GL.Viewport((int)cityViewportX, (int)cityViewportY, (int)cityViewportWidth, (int)cityViewportHeight);
+            GL.MatrixMode(MatrixMode.Projection);
+            GL.LoadIdentity();
             //gluPerspective(20.0, (GLdouble)(cityViewportWidth / cityViewportWidth), 0.01, 400.0);
-            //glMatrixMode(GL_MODELVIEW);
-            //glLoadIdentity();
+
+            pp = Matrix4d.CreatePerspectiveFieldOfView(Helpers.ToRadians(20),
+                (cityViewportWidth / cityViewportWidth), 0.01, 400.0);
+            GL.LoadMatrix(ref pp);
+
+            GL.MatrixMode(MatrixMode.Modelview);
+            GL.LoadIdentity();
             //gluLookAt(0.1, 101, 0, 0, 0, 0, 0, 1, 0);
+            pp = Matrix4d.LookAt(0.1, 101, 0, 0, 0, 0, 0, 1, 0);
+
+
+            GL.LoadMatrix(ref pp);
+
+
             //glLightfv(GL_LIGHT0, GL_POSITION, light_position0);
 
             //glUniform1i(texModeLocation, 2);
@@ -254,9 +346,122 @@ namespace CityBattleDrones_Port
 
             gl.SwapBuffers();   // Double buffering, swap buffers
         }
+
+        void drawAssets()
+        {            
+            //GL.TexEnv(TextureEnvTarget.TextureEnv, TextureEnvParameter.TextureEnvMode, OpenTK.Graphics.OpenGL.All.Modulate);
+
+            Vector2d[] stCoordinates = new Vector2d[]{ new Vector2d(0, 0),
+                new Vector2d(0, 1), new Vector2d(1, 1), new Vector2d(1, 0)};
+
+
+            // Set material properties of the streets
+            /*GL.Material(GL_FRONT, GL_AMBIENT, street_ambient);
+            GL.Material(GL_FRONT, GL_SPECULAR, street_specular);
+            GL.Material(GL_FRONT, GL_DIFFUSE, street_diffuse);
+            GL.Material(GL_FRONT, GL_SHININESS, street_shininess);*/
+
+            for (int i = 0; i < streets.Count; i++)
+            {
+                GL.PushMatrix();
+                GL.Translate(0, 0.001 * i, 0);
+                streets[i].draw(2016);
+                GL.PopMatrix();
+            }
+
+            //skybox
+            //glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
+            //glDisable(GL_CULL_FACE);
+            //glUniform1i(texModeLocation, 1);
+            GL.PushMatrix();
+            GL.Translate(0, 0, 0);
+            skybox.draw(2002, stSkySideCoords, stSkyTopCoords, stSkyBottomCoords);
+            GL.PopMatrix();
+            //GL.Uniform1(texModeLocation, 0);
+            //GL.TexEnv(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+            //GL.Enable(GL_CULL_FACE);
+            GL.CullFace(CullFaceMode.Back);
+
+            // Set ground block material properties
+            //GL.Material(GL_FRONT, GL_AMBIENT, block_mat_ambient);
+            //GL.Material(GL_FRONT, GL_SPECULAR, block_mat_specular);
+            //GL.Material(GL_FRONT, GL_DIFFUSE, block_mat_diffuse);
+            //GL.Material(GL_FRONT, GL_SHININESS, block_mat_shininess);
+
+            for (int i = 0; i < buildings.Count; i++)
+            {
+                buildings[i].draw(2003 + buildingTextures[i], stCoordinates, true, 2009 + roofTextures[i]);
+            }
+
+            // Set material properties of the ground
+            //GL.Materialfv(GL_FRONT, GL_AMBIENT, ground_ambient);
+            //GL.Materialfv(GL_FRONT, GL_SPECULAR, ground_specular);
+            //GL.Materialfv(GL_FRONT, GL_DIFFUSE, ground_diffuse);
+            //GL.Materialfv(GL_FRONT, GL_SHININESS, ground_shininess);
+
+            //Draw ground quad
+            ground.draw(2000, stCoordinates, false);
+
+            droneEnemy.draw();
+            dronePlayer.draw();
+        }
         public void drawMap()
         {
 
+            // Set material properties of the streets
+            /*glMaterialfv(GL_FRONT, GL_AMBIENT, streetMap_ambient);
+            glMaterialfv(GL_FRONT, GL_SPECULAR, streetMap_specular);
+            glMaterialfv(GL_FRONT, GL_DIFFUSE, streetMap_diffuse);
+            glMaterialfv(GL_FRONT, GL_SHININESS, streetMap_shininess);*/
+
+            for (int i = 0; i < streets.Count; i++)
+            {
+                streets[i].draw();
+            }
+
+            // Set ground block material properties
+            /*glMaterialfv(GL_FRONT, GL_AMBIENT, block_mat_ambient);
+            glMaterialfv(GL_FRONT, GL_SPECULAR, block_mat_specular);
+            glMaterialfv(GL_FRONT, GL_DIFFUSE, block_mat_diffuse);
+            glMaterialfv(GL_FRONT, GL_SHININESS, block_mat_shininess);*/
+
+            for (int i = 0; i < buildings.Count; i++)
+            {
+                buildings[i].draw();
+            }
+
+            // Set material properties of the ground
+            /*glMaterialfv(GL_FRONT, GL_AMBIENT, ground_ambient);
+            glMaterialfv(GL_FRONT, GL_SPECULAR, ground_specular);
+            glMaterialfv(GL_FRONT, GL_DIFFUSE, ground_diffuse);
+            glMaterialfv(GL_FRONT, GL_SHININESS, ground_shininess);*/
+
+            //Draw ground quad
+            ground.draw();
+
+            // Set material properties of the the drone player's map icon
+            /*glMaterialfv(GL_FRONT, GL_AMBIENT, dpMap_ambient);
+            glMaterialfv(GL_FRONT, GL_SPECULAR, dpMap_specular);
+            glMaterialfv(GL_FRONT, GL_DIFFUSE, dpMap_diffuse);
+            glMaterialfv(GL_FRONT, GL_SHININESS, dpMap_shininess);*/
+
+            GL.PushMatrix();
+            GL.Translate(dronePlayer.getPosition().X, 10, dronePlayer.getPosition().Z);
+            GL.Rotate(dronePlayer.getRotationY(), 0, 1, 0);
+            dpMapIcon.draw();
+            GL.PopMatrix();
+
+            // Set material properties of the the drone player's map icon
+            /*glMaterialfv(GL_FRONT, GL_AMBIENT, deMap_ambient);
+            glMaterialfv(GL_FRONT, GL_SPECULAR, deMap_specular);
+            glMaterialfv(GL_FRONT, GL_DIFFUSE, deMap_diffuse);
+            glMaterialfv(GL_FRONT, GL_SHININESS, deMap_shininess);*/
+
+            GL.PushMatrix();
+            GL.Translate(droneEnemy.getPosition().X, 10, droneEnemy.getPosition().Z);
+            GL.Rotate(droneEnemy.getRotationY(), 0, 1, 0);
+            deMapIcon.draw();
+            GL.PopMatrix();
         }
         private void Gl_MouseMove(object sender, MouseEventArgs e)
         {
@@ -386,6 +591,7 @@ namespace CityBattleDrones_Port
             {
                 // Initialize GL
                 initOpenGL(windowWidth, windowHeight);
+                reshape(Width,Height);
                 first = false;
             }
             GL.Viewport(0, 0, gl.Width, gl.Height);
@@ -403,11 +609,20 @@ namespace CityBattleDrones_Port
             //var view = camera.GetViewMatrix();
             //var projection = Matrix4.CreatePerspectiveFieldOfView((float)Camera.torad(camera.Zoom), (float)gl.Width / (float)gl.Height, 0.1f, 100.0f);
 
-
-
+            GL.Disable(EnableCap.Lighting);
+            GL.Color3(Color.Red);
+            GL.Begin(PrimitiveType.Lines);
+            GL.Vertex3(0, 0,0);
+            GL.Vertex3(100, 0,0);
+            GL.Color3(Color.Blue);
+            GL.Vertex3(0, 0, 0);
+            GL.Vertex3(0, 100, 0);
+            GL.End();
+            display();
+            
             gl.SwapBuffers();
         }
 
-        //Camera camera = new Camera(new Vector3(0.0f, 0.0f, 3.0f));
+        //CameraOld camera = new CameraOld(new OpenTK.Vector3(0.0f, 0.0f, 3.0f));
     }
 }

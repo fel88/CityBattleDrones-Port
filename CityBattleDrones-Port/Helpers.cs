@@ -8,5 +8,10 @@ namespace CityBattleDrones_Port
         {
             return float.Parse(str.Replace(",", "."), CultureInfo.InvariantCulture);
         }
+
+        internal static double ToRadians(double v)
+        {
+            return v * Math.PI / 180.0;
+        }
     }
 }

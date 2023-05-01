@@ -10,7 +10,7 @@ namespace CityBattleDrones_Port
         public float scaleZ;
         public float rotationY;
         public Vector3d position;
-        public Polygon streetPoly;
+        public Polygon streetPoly = new Polygon();
 
         public Street()
         {
@@ -30,7 +30,8 @@ namespace CityBattleDrones_Port
             position.X += deltaX * 0.5;
             position.Z += deltaZ * 0.5;
         }
-        public void changeScaleFactors(float deltaX, float deltaZ) {
+        public void changeScaleFactors(float deltaX, float deltaZ)
+        {
             scaleX += deltaX;
             scaleZ += deltaZ;
 
@@ -54,7 +55,8 @@ namespace CityBattleDrones_Port
             return md;
         }
         public void processMetaData(string md) { }
-        public void draw(int textID) {
+        public void draw(int textID)
+        {
             float streetLength = scaleX * 2;
             float streetWidth = scaleZ * 2;
             float ratio = 3; // street texture should be 3 times longer than its width

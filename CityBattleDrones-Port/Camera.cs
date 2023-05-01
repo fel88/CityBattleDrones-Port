@@ -2,139 +2,85 @@
 
 namespace CityBattleDrones_Port
 {
-    public class CameraOld
+    public class Camera
     {
-        public enum Camera_Movement
+        public float azimuth;
+        public float elevation;
+        public float zoomDistance;
+        public float azimuthChangeRate;
+        public float elevationChangeRate;
+        public float zoomChangeRate;
+        public float clickX;
+        public float clickY;
+        public bool clickAndDrag;
+        public float minElevation = 5;
+        public float maxElevation = 85;
+        public float minZoomDistance = 0.01f;
+        public float maxZoomDistance = 20;
+        public Vector3d position;
+        public Vector3d focus;
+        public Vector3d forward;
+        //boolean array to keep track of when a control is actioned:
+        //changing azimuth, changing elevation, zooming in and out
+        public bool[] controlActions = new bool[3];
+        const double DEGTORAD = (Math.PI / 180.0);
+        public Camera() { }
+        public void update()
         {
-            FORWARD,
-            BACKWARD,
-            LEFT,
-            RIGHT
-        };
+            if (controlActions[0]) azimuth += azimuthChangeRate;
+            if (controlActions[1]) elevation += elevationChangeRate;
+            if (controlActions[2]) zoomDistance -= zoomChangeRate;
 
-        // Default camera values
-        const float YAW = -90.0f;
-        const float PITCH = 0.0f;
-        const float SPEED = 2.5f;
-        const float SENSITIVITY = 0.1f;
-        const float ZOOM = 45.0f;
-
-        // Camera Attributes
-        public Vector3 Position;
-        public Vector3 Front;
-        public Vector3 Up;
-        public Vector3 Right;
-        public Vector3 WorldUp;
-        // Euler Angles
-        float Yaw;
-        float Pitch;
-        // Camera options
-        float MovementSpeed;
-        float MouseSensitivity;
-        public float Zoom;
-
-        // Constructor with vectors
-        public CameraOld(Vector3? position = null,
-            Vector3? up = null, float yaw = YAW, float pitch = PITCH)
-
-        {
-            if (position == null) position = Vector3.Zero;
-            if (up == null) up = Vector3.UnitY;
-            Front = -Vector3.UnitZ;
-            MovementSpeed = SPEED;
-            MouseSensitivity = SENSITIVITY;
-            Zoom = ZOOM;
-            Position = position.Value;
-            WorldUp = up.Value;
-            Yaw = yaw;
-            Pitch = pitch;
-            updateCameraVectors();
-        }
-
-        // Constructor with scalar values
-        public CameraOld(float posX, float posY, float posZ, float upX, float upY, float upZ, float yaw, float pitch)
-        {
-            Front = new Vector3(0.0f, 0.0f, -1.0f);
-            MovementSpeed = SPEED;
-            MouseSensitivity = SENSITIVITY;
-            Zoom = ZOOM;
-            Position = new Vector3(posX, posY, posZ);
-            WorldUp = new Vector3(upX, upY, upZ);
-            Yaw = yaw;
-            Pitch = pitch;
-            updateCameraVectors();
-        }
-
-        // Returns the view matrix calculated using Euler Angles and the LookAt Matrix
-        public Matrix4 GetViewMatrix()
-        {
-            return Matrix4.LookAt(Position, Position + Front, Up);
-        }
-
-        // Processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)
-        public void ProcessKeyboard(Camera_Movement direction, float deltaTime)
-        {
-            float velocity = MovementSpeed * deltaTime;
-            if (direction == Camera_Movement.FORWARD)
-                Position += Front * velocity;
-            if (direction == Camera_Movement.BACKWARD)
-                Position -= Front * velocity;
-            if (direction == Camera_Movement.LEFT)
-                Position -= Right * velocity;
-            if (direction == Camera_Movement.RIGHT)
-                Position += Right * velocity;
-        }
-
-        // Processes input received from a mouse input system. Expects the offset value in both the x and y direction.
-        public void ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch = true)
-        {
-            xoffset *= MouseSensitivity;
-            yoffset *= MouseSensitivity;
-
-            Yaw += xoffset;
-            Pitch += yoffset;
-
-            // Make sure that when pitch is out of bounds, screen doesn't get flipped
-            if (constrainPitch)
+            if (azimuth >= 360)
             {
-                if (Pitch > 89.0f)
-                    Pitch = 89.0f;
-                if (Pitch < -89.0f)
-                    Pitch = -89.0f;
+                azimuth -= 360;
+            }
+            else if (azimuth < 0)
+            {
+                azimuth += 360;
             }
 
-            // Update Front, Right and Up Vectors using the updated Euler angles
-            updateCameraVectors();
-        }
+            if (elevation < minElevation)
+            {
+                elevation = minElevation;
+            }
+            else if (elevation > maxElevation)
+            {
+                elevation = maxElevation;
+            }
 
-        // Processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
-        public void ProcessMouseScroll(float yoffset)
-        {
-            if (Zoom >= 1.0f && Zoom <= 45.0f)
-                Zoom -= yoffset;
-            if (Zoom <= 1.0f)
-                Zoom = 1.0f;
-            if (Zoom >= 45.0f)
-                Zoom = 45.0f;
-        }
+            if (zoomDistance < minZoomDistance)
+            {
+                zoomDistance = minZoomDistance;
+            }
+            else if (zoomDistance > maxZoomDistance)
+            {
+                zoomDistance = maxZoomDistance;
+            }
 
-        public static double torad(double f)
-        {
-            return f * Math.PI / 180;
-        }
+            //change elevation
+            position.X = 0;
+            position.Y = zoomDistance * Math.Sin(elevation * DEGTORAD);
+            position.Z = zoomDistance * Math.Cos(elevation * DEGTORAD);
 
-        void updateCameraVectors()
-        {
-            // Calculate the new Front vector
-            Vector3 front = new Vector3();
+            //change azimuth
+            position.X = position.Z * Math.Sin(azimuth * DEGTORAD);
+            position.Z = position.Z * Math.Cos(azimuth * DEGTORAD);
 
-            front.X = (float)(Math.Cos(torad(Yaw)) * Math.Cos(torad(Pitch)));
-            front.Y = (float)Math.Sin(torad(Pitch));
-            front.Z = (float)(Math.Sin(torad(Yaw)) * Math.Cos(torad(Pitch)));
-            Front = front.Normalized();
-            // Also re-calculate the Right and Up vector
-            Right = Vector3.Normalize(Vector3.Cross(Front, WorldUp));  // Normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
-            Up = Vector3.Normalize(Vector3.Cross(Right, Front));
+            position = Vector3d.Add(position, focus);
+
+            forward = Vector3d.Subtract(focus, position);
+            forward.Normalize();
         }
-    };
+        public void setAzimuthChangeRate(float rate) { }
+        public void setElevationChangeRate(float rate) { }
+        public void setZoomChangeRate(float rate) { }
+        public void setElevation(float angle) { }
+        public void setAzimuth(double angle) { }
+        public void setZoom(float distance) { }
+        public void changeFocus(Vector3d newFocus) { }
+        public void move(float mouseX, float mouseY) { }
+        public void setMinElevation(float newMin) { }
+        public void setMaxElevation(float newMax) { }
+    }
 }
