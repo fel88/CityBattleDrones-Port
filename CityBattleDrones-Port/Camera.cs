@@ -4,9 +4,9 @@ namespace CityBattleDrones_Port
 {
     public class Camera
     {
-        public float azimuth;
+        public double azimuth;
         public float elevation;
-        public float zoomDistance;
+        public double zoomDistance;
         public float azimuthChangeRate;
         public float elevationChangeRate;
         public float zoomChangeRate;
@@ -15,7 +15,7 @@ namespace CityBattleDrones_Port
         public bool clickAndDrag;
         public float minElevation = 5;
         public float maxElevation = 85;
-        public float minZoomDistance = 0.01f;
+        public double minZoomDistance = 0.01f;
         public float maxZoomDistance = 20;
         public Vector3d position;
         public Vector3d focus;
@@ -24,7 +24,29 @@ namespace CityBattleDrones_Port
         //changing azimuth, changing elevation, zooming in and out
         public bool[] controlActions = new bool[3];
         const double DEGTORAD = (Math.PI / 180.0);
-        public Camera() { }
+        const double DEFAULT_ZOOM = 0.5;
+        public Camera() {
+            azimuth = 0;
+            elevation = (18);
+            zoomDistance=(DEFAULT_ZOOM);
+            clickX=(0);
+            clickY=(0);
+            clickAndDrag=(false);
+            azimuthChangeRate=(3);
+            elevationChangeRate=(3);
+            zoomChangeRate=(3);
+            position=(new Vector3d());
+            forward=(new Vector3d());
+            focus=(new Vector3d(0, 0, 0));
+            minElevation=(5);
+            maxElevation=(85);
+            minZoomDistance=(0.01);
+            maxZoomDistance=20;
+            controlActions[0] = false;
+            controlActions[1] = false;
+            controlActions[2] = false;
+            update();
+        }
         public void update()
         {
             if (controlActions[0]) azimuth += azimuthChangeRate;
@@ -72,15 +94,24 @@ namespace CityBattleDrones_Port
             forward = Vector3d.Subtract(focus, position);
             forward.Normalize();
         }
-        public void setAzimuthChangeRate(float rate) { }
-        public void setElevationChangeRate(float rate) { }
-        public void setZoomChangeRate(float rate) { }
-        public void setElevation(float angle) { }
-        public void setAzimuth(double angle) { }
-        public void setZoom(float distance) { }
-        public void changeFocus(Vector3d newFocus) { }
-        public void move(float mouseX, float mouseY) { }
-        public void setMinElevation(float newMin) { }
-        public void setMaxElevation(float newMax) { }
+        public void setAzimuthChangeRate(float rate) { azimuthChangeRate = rate; }
+        public void setElevationChangeRate(float rate) { elevationChangeRate = rate; }
+        public void setZoomChangeRate(float rate) { zoomChangeRate = rate; }
+        public void setElevation(float angle) { elevation = angle; }
+        public void setAzimuth(double angle) { azimuth = angle; }
+        public void setZoom(float distance) { zoomDistance = distance; }
+        public void changeFocus(Vector3d newFocus) { focus = newFocus; }
+        public void move(float mouseX, float mouseY) {
+            azimuth += (clickX - mouseX) / 800;
+            elevation += (mouseY - clickY) / 8;
+            clickX = mouseX;
+            clickY = mouseY;
+        }
+        public void setMinElevation(float newMin) {
+            minElevation = newMin;
+        }
+        public void setMaxElevation(float newMax) {
+            maxElevation = newMax;
+        }
     }
 }

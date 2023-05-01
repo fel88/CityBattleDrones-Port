@@ -1,5 +1,6 @@
 using OpenTK;
 using OpenTK.Graphics.OpenGL;
+using OpenTK.Platform.MacOS;
 using OpenTK.Platform.Windows;
 using System;
 using System.Collections.Generic;
@@ -12,6 +13,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Windows.Forms;
 using static System.Net.Mime.MediaTypeNames;
+using static System.Net.WebRequestMethods;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace CityBattleDrones_Port
@@ -81,6 +83,11 @@ namespace CityBattleDrones_Port
         const int worldSize = 300;            // Size of the world, used for the skybox
         const double tpViewportRatio = 0.7; // Window Width Ratio for the third-person viewport
 
+        static int program = 0;
+        static int  texMapLocation;
+        static int texModeLocation;
+        static int spotlightModeLocation;
+
         //Boundaries of the city viewport
         static double cityViewportX;
         static double cityViewportY;
@@ -92,7 +99,7 @@ namespace CityBattleDrones_Port
         static double fpViewportY;
         static double fpViewportWidth;
         static double fpViewportHeight;
-    
+
         //Initialize a drone object
         static Vector3d playerSpawnPoint = new Vector3d(0.0, 4.0, -3.0);
         static Vector3d enemySpawnPoint = new Vector3d(0.0, 4.0, 4.0);
@@ -123,6 +130,79 @@ namespace CityBattleDrones_Port
         static float[] light_diffuse = { 1.0f, 0.95f, 0.7f, 1.0f };
         static float[] light_specular = { 1.0f, 0.9f, 0.7f, 1.0f };
         static float[] light_ambient = { 0.95F, 0.8F, 0.6F, 1.0F };
+
+        /* shader reader */
+        /* creates null terminated string from file */
+
+        static string readShaderSource(string shaderFile)
+        {
+            var txt = System.IO.File.ReadAllText(shaderFile);
+            return txt;
+        }
+
+        /* GLSL initialization */
+
+        static void initShader(string vShaderFile, string fShaderFile)
+        {
+
+            bool status = GL.GetError() == ErrorCode.NoError;
+            string vSource, fSource;
+            int vShader, fShader;
+            
+
+            /* read shader files */
+
+            vSource = readShaderSource(vShaderFile);
+            //checkError(status, "Failed to read vertex shader");
+
+            fSource = readShaderSource(fShaderFile);
+            //checkError(status, "Failed to read fragment shader");
+
+            ///* create program and shader objects */
+
+            vShader = GL.CreateShader(ShaderType.VertexShader);
+            fShader = GL.CreateShader(ShaderType.FragmentShader);
+            program = GL.CreateProgram();
+
+            ///* attach shaders to the program object */
+            
+            GL.AttachShader(program, vShader);
+            GL.AttachShader(program, fShader);
+
+            ///* read shaders */
+            
+            GL.ShaderSource(vShader, vSource);
+            GL.ShaderSource(fShader, fSource);
+            
+            ///* compile shaders */
+
+            GL.CompileShader(vShader);
+            GL.CompileShader(fShader);
+
+            ///* error check */
+
+            //glGetShaderiv(vShader, GL_COMPILE_STATUS, &status);
+            //checkError(status, "Failed to compile the vertex shader.");
+
+            //glGetShaderiv(fShader, GL_COMPILE_STATUS, &status);
+            //checkError(status, "Failed to compile the fragment shader.");
+
+            ///* link */
+
+            GL.LinkProgram(program);
+            //glGetShaderiv(program, GL_LINK_STATUS, &status);
+            ////checkError(status, "Failed to link the shader program object.");
+
+            ///* use program object */
+
+            GL.UseProgram(program);
+
+            ///* set up uniform parameter */
+
+            texMapLocation = GL.GetUniformLocation(program, "texMap");
+            texModeLocation = GL.GetUniformLocation(program, "texMode");
+            spotlightModeLocation = GL.GetUniformLocation(program, "spotlightMode");
+        }
 
 
         // Callback, called at initialization and whenever user resizes the window.
@@ -252,7 +332,7 @@ namespace CityBattleDrones_Port
         void display()
         {
             defaultSetup();
-            
+
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             for (int j = 0; j < dronePlayer.missiles.Count; j++)
@@ -285,7 +365,7 @@ namespace CityBattleDrones_Port
             GL.Viewport(0, 0, (int)(windowWidth * tpViewportRatio), windowHeight);
             GL.MatrixMode(MatrixMode.Projection);
             GL.LoadIdentity();
-            var pp = Matrix4d.CreatePerspectiveFieldOfView(Helpers.ToRadians( 60.0), (windowWidth * tpViewportRatio / windowHeight), 0.01, 400.0);
+            var pp = Matrix4d.CreatePerspectiveFieldOfView(Helpers.ToRadians(60.0), (windowWidth * tpViewportRatio / windowHeight), 0.01, 400.0);
             GL.LoadMatrix(ref pp);
 
             GL.MatrixMode(MatrixMode.Modelview);
@@ -296,21 +376,22 @@ namespace CityBattleDrones_Port
 
             GL.Light(LightName.Light0, LightParameter.Position, light_position0);
 
-            //glUniform1i(texMapLocation, 0);
-            //glUniform1i(texModeLocation, 0);
+            GL.Uniform1(texMapLocation, 0);
+            GL.Uniform1(texModeLocation, 0);
+
             drawAssets();
 
             GL.Viewport((int)fpViewportX, (int)fpViewportY, (int)fpViewportWidth, (int)fpViewportHeight);
             GL.MatrixMode(MatrixMode.Projection);
             GL.LoadIdentity();
 
-            pp = Matrix4d.CreatePerspectiveFieldOfView(Helpers.ToRadians( 60.0),
-                (fpViewportWidth  / fpViewportHeight), 0.005, 400.0);
-             GL.LoadMatrix(ref pp);
+            pp = Matrix4d.CreatePerspectiveFieldOfView(Helpers.ToRadians(60.0),
+                (fpViewportWidth / fpViewportHeight), 0.005, 400.0);
+            GL.LoadMatrix(ref pp);
 
             GL.MatrixMode(MatrixMode.Modelview);
             GL.LoadIdentity();
-             GL.LoadMatrix(ref pp);
+            GL.LoadMatrix(ref pp);
 
             //float invertedY = fpCamera.focus.y - (fpCamera.position.y - fpCamera.focus.y);
             //GL.LookAt(fpCamera.focus.x, fpCamera.focus.y, fpCamera.focus.z, fpCamera.position.x, invertedY, fpCamera.position.z, 0, 1, 0);
@@ -344,11 +425,11 @@ namespace CityBattleDrones_Port
             drawMap();
 
 
-            gl.SwapBuffers();   // Double buffering, swap buffers
+            //gl.SwapBuffers();   // Double buffering, swap buffers
         }
 
         void drawAssets()
-        {            
+        {
             //GL.TexEnv(TextureEnvTarget.TextureEnv, TextureEnvParameter.TextureEnvMode, OpenTK.Graphics.OpenGL.All.Modulate);
 
             Vector2d[] stCoordinates = new Vector2d[]{ new Vector2d(0, 0),
@@ -477,7 +558,7 @@ namespace CityBattleDrones_Port
             List<Building> loadedBuildings = new List<Building>();
             List<Street> loadedStreets = new List<Street>();
 
-            var lines = File.ReadAllLines(filename);
+            var lines = System.IO.File.ReadAllLines(filename);
             foreach (var line in lines)
             {
 
@@ -591,7 +672,9 @@ namespace CityBattleDrones_Port
             {
                 // Initialize GL
                 initOpenGL(windowWidth, windowHeight);
-                reshape(Width,Height);
+                reshape(Width, Height);
+
+                initShader("Shaders/vShader.glsl", "Shaders/fShader.glsl");
                 first = false;
             }
             GL.Viewport(0, 0, gl.Width, gl.Height);
@@ -609,17 +692,44 @@ namespace CityBattleDrones_Port
             //var view = camera.GetViewMatrix();
             //var projection = Matrix4.CreatePerspectiveFieldOfView((float)Camera.torad(camera.Zoom), (float)gl.Width / (float)gl.Height, 0.1f, 100.0f);
 
+            GL.Viewport(0, 0, (int)(windowWidth * tpViewportRatio), windowHeight);
+            GL.MatrixMode(MatrixMode.Projection);
+            GL.LoadIdentity();
+            var pp = Matrix4d.CreatePerspectiveFieldOfView(Helpers.ToRadians(60.0), (windowWidth * tpViewportRatio / windowHeight), 0.01, 400.0);
+            GL.LoadMatrix(ref pp);
+
+            GL.MatrixMode(MatrixMode.Modelview);
+            GL.LoadIdentity();
+            pp = Matrix4d.LookAt(50, 50, 50, 0, 0, 0, 0, 1, 0);
+            GL.LoadMatrix(ref pp);
+
+            /////////
             GL.Disable(EnableCap.Lighting);
             GL.Color3(Color.Red);
             GL.Begin(PrimitiveType.Lines);
-            GL.Vertex3(0, 0,0);
-            GL.Vertex3(100, 0,0);
+            GL.Vertex3(0, 0, 0);
+            GL.Vertex3(100, 0, 0);
             GL.Color3(Color.Blue);
             GL.Vertex3(0, 0, 0);
             GL.Vertex3(0, 100, 0);
+            GL.Color3(Color.Green);
+            GL.Vertex3(0, 0, 0);
+            GL.Vertex3(0, 0, 100);
             GL.End();
-            display();
-            
+
+            GL.Disable(EnableCap.CullFace);
+
+            //ground.draw();
+            foreach (var item in buildings)
+            {
+                item.draw();
+            }
+            foreach (var item in streets)
+            {
+                item.draw();
+            }
+            //display();
+
             gl.SwapBuffers();
         }
 
