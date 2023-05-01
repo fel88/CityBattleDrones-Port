@@ -9,7 +9,7 @@ namespace CityBattleDrones_Port
 
         public Vector3d normal;
         public List<Vector3d> verts = new List<Vector3d>();
-        bool isFrontFacing;
+        public bool isFrontFacing;
 
         public Polygon() { }
         public void calculateNormal()

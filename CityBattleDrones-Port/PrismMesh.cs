@@ -1,24 +1,21 @@
 ﻿using OpenTK;
+using OpenTK.Graphics.OpenGL;
 
 namespace CityBattleDrones_Port
 {
     public class PrismMesh
     {
-
-        protected
-    int numBaseEdges;
+        protected int numBaseEdges;
         protected float rotationY;
         protected float initialHeight;
         protected float currentHeight;
         protected Vector3d scaleFactors;
         const double minScaleFactor = 0.05;
 
-        public
-
-    Polygon baseBottom;
-        public Polygon baseTop;
+        public Polygon baseBottom = new Polygon();
+        public Polygon baseTop = new Polygon();
         public Vector3d position;
-        public List<Polygon> quads;
+        public List<Polygon> quads = new List<Polygon>();
 
         public PrismMesh() { }
         public PrismMesh(int numEdges) { }
@@ -26,7 +23,22 @@ namespace CityBattleDrones_Port
         {
 
         }
-        public void draw() { }
+
+        // Draw the prism without any textures
+        public void draw()
+        {
+            GL.PushMatrix();
+            GL.Translate(position.X, position.Y, position.Z);
+            GL.Rotate(rotationY, 0.0, 1.0, 0.0);
+            GL.Scale(scaleFactors.X, scaleFactors.Y, scaleFactors.Z);
+            baseBottom.draw();
+            baseTop.draw();
+            foreach (var quad in quads)
+            {
+                quad.draw();
+            }
+            GL.PopMatrix();
+        }
         public void draw(int quadTexID, Vector2d[] stQuadCoords, bool baseTex, int baseTexID) { }
         public void draw(int textID, Vector2d[][] stSideCoords, Vector2d[] stTopCoords, Vector2d[] stBottomCoords) { }
         public void build() { }
