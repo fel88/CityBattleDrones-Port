@@ -13,4 +13,10 @@
     <PackageReference Include="OpenTK.GLControl" Version="3.3.3" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="CityMetaData3.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

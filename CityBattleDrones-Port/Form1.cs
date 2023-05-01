@@ -34,9 +34,22 @@ namespace CityBattleDrones_Port
             gl.MouseWheel += Gl_MouseWheel;
             KeyDown += Form1_KeyDown;
             gl.KeyDown += Gl_KeyDown;
-            Controls.Add(gl);
+
             gl.Dock = DockStyle.Fill;
+
+            Controls.Add(gl);
         }
+
+
+
+
+        int windowWidth = 1200;
+        int windowHeight = 600;
+
+        const int groundLength = 36;          // Default ground length
+        const int groundWidth = 36;           // Default ground height
+        const int worldSize = 300;            // Size of the world, used for the skybox
+        const double tpViewportRatio = 0.7; // Window Width Ratio for the third-person viewport
 
         //Initialize a drone object
         static Vector3d playerSpawnPoint = new Vector3d(0.0, 4.0, -3.0);
@@ -48,17 +61,124 @@ namespace CityBattleDrones_Port
         DroneAI droneEnemy = new DroneAI(0.02, 6, 2, enemySpawnPoint, 20);
 
 
-        static Camera tpCamera;          //third-person camera for the drone
-        static Camera fpCamera;          //first-person camera for the drone
+        static Camera tpCamera = new Camera();          //third-person camera for the drone
+        static Camera fpCamera = new Camera();          //first-person camera for the drone
 
         static List<Building> buildings = new List<Building>();                //array of buildings
         static List<Street> streets = new List<Street>();
         static List<int> buildingTextures = new List<int>();
         static List<int> roofTextures = new List<int>();
+        static string CityMetaDataFile = "CityMetaData3.txt";
+        static Polygon ground = new Polygon();
+        static PrismMesh skybox = new PrismMesh();
+        static Polygon dpMapIcon = new Polygon();
+        static Polygon deMapIcon = new Polygon();
 
         //Textures
         public static List<string> texFiles = new List<string>(); //array of texture filenames
+                                                                  // Light properties
+        static float[] light_position0 = { worldSize * 0.5f, worldSize * 0.1f, -worldSize * 0.1f, 1.0F };
+        static float[] light_diffuse = { 1.0f, 0.95f, 0.7f, 1.0f };
+        static float[] light_specular = { 1.0f, 0.9f, 0.7f, 1.0f };
+        static float[] light_ambient = { 0.95F, 0.8F, 0.6F, 1.0F };
 
+        // Set up OpenGL. For viewport and projection setup see reshape(). */
+        void initOpenGL(int w, int h)
+        {
+            // Set up and enable lighting
+            GL.Light(LightName.Light0, LightParameter.Ambient, light_ambient);
+            GL.Light(LightName.Light0, LightParameter.Diffuse, light_diffuse);
+            GL.Light(LightName.Light0, LightParameter.Specular, light_specular);
+
+            GL.Light(LightName.Light0, LightParameter.Position, light_position0);
+            GL.Enable(EnableCap.Lighting);
+            GL.Enable(EnableCap.Light0);
+
+            // Other OpenGL setup
+            GL.Enable(EnableCap.DepthTest);   // Remove hidded surfaces
+            GL.ShadeModel(ShadingModel.Smooth);   // Use smooth shading, makes boundaries between polygons harder to see 
+            GL.ClearColor(0.6F, 0.6F, 0.6F, 0.0F);  // Color and depth for glClear
+            GL.ClearDepth(1.0f);
+            GL.Enable(EnableCap.Normalize);    // Renormalize normal vectors 
+            GL.Hint(HintTarget.PerspectiveCorrectionHint, HintMode.Nicest);   // Nicer perspective
+
+            GL.Enable(EnableCap.CullFace);
+            GL.CullFace(CullFaceMode.Back);
+
+            //Load textures
+            texFiles.Add("Textures/cityGround2.bmp");      //2000
+
+            texFiles.Add("Textures/steelGradient.bmp");    //2001
+
+            texFiles.Add("Textures/skybox1.bmp");          //2002
+
+            texFiles.Add("Textures/floorTex1.bmp");        //2003
+            texFiles.Add("Textures/floorTex2.bmp");        //2004
+            texFiles.Add("Textures/floorTex3.bmp");        //2005
+            texFiles.Add("Textures/floorTex4.bmp");        //2006
+            texFiles.Add("Textures/floorTex5.bmp");        //2007
+            texFiles.Add("Textures/floorTex6.bmp");        //2008
+
+            texFiles.Add("Textures/roofTex1.bmp");         //2009
+            texFiles.Add("Textures/roofTex2.bmp");         //2010
+            texFiles.Add("Textures/roofTex3.bmp");         //2011
+            texFiles.Add("Textures/redMetal2.bmp");        //2012
+
+            texFiles.Add("Textures/missileTex1.bmp");      //2013
+            texFiles.Add("Textures/smoke1.png");           //2014
+            texFiles.Add("Textures/blast.bmp");            //2015
+
+            texFiles.Add("Textures/street.bmp");           //2016
+
+            loadTextures(texFiles.ToArray());
+
+            skybox.changeScaleFactors(new Vector3d(worldSize, worldSize, worldSize));
+
+            ground.verts.Add(new Vector3d(-groundLength / 2, -0.1, -groundWidth / 2));
+            ground.verts.Add(new Vector3d(-groundLength / 2, -0.1, groundWidth / 2));
+            ground.verts.Add(new Vector3d(groundLength / 2, -0.1, groundWidth / 2));
+            ground.verts.Add(new Vector3d(groundLength / 2, -0.1, -groundWidth / 2));
+            ground.calculateNormal();
+
+            fpCamera.setElevation(5);
+
+            List<Vector3d> verts = new List<Vector3d>(){new Vector3d(-0.5, 0, -0.75),
+                new Vector3d(0, 0, 0.75),new Vector3d(0.5, 0, -0.75)};
+            dpMapIcon.verts = verts;
+            deMapIcon.verts = verts;
+            dpMapIcon.calculateNormal();
+            deMapIcon.calculateNormal();
+
+            loadCity(CityMetaDataFile);
+        }
+
+        void loadTextures(string[] texFiles)
+        {
+            for (int i = 0; i < texFiles.Length; i++)
+            {
+                int x, y, n = 1;
+                string filename = texFiles[i];
+                //unsigned char* data = stbi_load(filename, &x, &y, &n, 0);
+
+                //glBindTexture(GL_TEXTURE_2D, 2000 + i);
+                //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+                // ... process data if not NULL ...
+                // ... x = width, y = height, n = # 8-bit components per pixel ...
+                // ... replace '0' with '1'..'4' to force that many components per pixel
+                // ... but 'n' will always be the number that it would have been if you said 0
+                if (n == 3)
+                {
+                    //GL.TexImage2D(GL_TEXTURE_2D, 0, GL_RGB, x, y, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+                }
+                else if (n == 4)
+                {
+                    // GL.TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+                }
+                //stbi_image_free(data);
+            }
+        }
         // Callback, called whenever GLUT determines that the window should be redisplayed
         // or glutPostRedisplay() has been called.
         void display()
@@ -259,8 +379,15 @@ namespace CityBattleDrones_Port
         uint cubeVAO, cubeVBO;
         uint cubeTexture;
 
+        bool first = true;
         private void timer1_Tick(object sender, EventArgs e)
         {
+            if (first)
+            {
+                // Initialize GL
+                initOpenGL(windowWidth, windowHeight);
+                first = false;
+            }
             GL.Viewport(0, 0, gl.Width, gl.Height);
 
             // render

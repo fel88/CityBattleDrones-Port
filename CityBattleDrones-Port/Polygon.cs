@@ -8,7 +8,7 @@ namespace CityBattleDrones_Port
 
 
         public Vector3d normal;
-        public List<Vector3d> verts;
+        public List<Vector3d> verts = new List<Vector3d>();
         bool isFrontFacing;
 
         public Polygon() { }
@@ -30,7 +30,7 @@ namespace CityBattleDrones_Port
             }
         }
 
-        public void draw(int texID, Vector2d[] stCoordinates, bool hasAlpha)        
+        public void draw(int texID, Vector2d[] stCoordinates, bool hasAlpha)
         {
             GL.BindTexture(TextureTarget.Texture2D, texID);
             GL.Enable(EnableCap.Texture2D);
