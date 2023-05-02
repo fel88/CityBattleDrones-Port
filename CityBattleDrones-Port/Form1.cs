@@ -1,4 +1,4 @@
-using OpenTK;
+﻿using OpenTK;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Platform.MacOS;
 using OpenTK.Platform.Windows;
@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 using System.Data.SqlTypes;
 using System.DirectoryServices.ActiveDirectory;
+using System.Drawing.Imaging;
+using System.Drawing;
 using System.IO;
 using System.Numerics;
 using System.Reflection;
@@ -84,7 +86,7 @@ namespace CityBattleDrones_Port
         const double tpViewportRatio = 0.7; // Window Width Ratio for the third-person viewport
 
         static int program = 0;
-        static int  texMapLocation;
+        static int texMapLocation;
         static int texModeLocation;
         static int spotlightModeLocation;
 
@@ -131,6 +133,42 @@ namespace CityBattleDrones_Port
         static float[] light_specular = { 1.0f, 0.9f, 0.7f, 1.0f };
         static float[] light_ambient = { 0.95F, 0.8F, 0.6F, 1.0F };
 
+        //Material properties for the ground blocks
+        static float[] block_mat_ambient = { 0.3F, 0.2F, 0.2F, 1.0F };
+        static float[] block_mat_specular = { 0.4F, 0.3F, 0.3F, 1.0F };
+        static float[] block_mat_diffuse = { 0.9F, 0.8F, 0.8F, 1.0F };
+        static float[] block_mat_shininess = { 0.8F };
+
+        // Ground material properties
+        static float[] ground_ambient = { 0.6F, 0.5F, 0.5F, 1.0F };
+        static float[] ground_specular = { 0.1F, 0.1F, 0.1F, 1.0F };
+        static float[] ground_diffuse = { 0.3F, 0.3F, 0.3F, 1.0F };
+        static float[] ground_shininess = { 0.1F };
+
+        // Street material properties
+        static float[] street_ambient = { 0.6F, 0.5F, 0.5F, 1.0F };
+        static float[] street_specular = { 0.15F, 0.1F, 0.1F, 1.0F };
+        static float[] street_diffuse = { 0.4F, 0.3F, 0.3F, 1.0F };
+        static float[] street_shininess = { 0.1F };
+
+        // Street Map material properties
+        static float[] streetMap_ambienе = { 0.4F, 0.4F, 0.4F, 1.0F };
+        static float[] streetMap_specular = { 0.15F, 0.1F, 0.1F, 1.0F };
+        static float[] streetMap_diffuse = { 0.3F, 0.3F, 0.3F, 1.0F };
+        static float[] streetMap_shininess = { 0.1F };
+
+        // Drone Player Map Icon material properties
+        static float[] dpMap_ambient = { 0.05F, 0.05F, 1.0F, 1.0F };
+        static float[] dpMap_specular = { 1.0F, 1.0F, 1.0F, 1.0F };
+        static float[] dpMap_diffuse = { 1.0F, 1.0F, 1.0F, 1.0F };
+        static float[] dpMap_shininess = { 0.8F };
+
+        // Drone Enemy Map Icon material properties
+        static float[] deMap_ambient = { 1.0F, 0.05F, 0.05F, 1.0F };
+        static float[] deMap_specular = { 1.0F, 1.0F, 1.0F, 1.0F };
+        static float[] deMap_diffuse = { 1.0F, 1.0F, 1.0F, 1.0F };
+        static float[] deMap_shininess = { 0.8F };
+
         /* shader reader */
         /* creates null terminated string from file */
 
@@ -148,7 +186,7 @@ namespace CityBattleDrones_Port
             bool status = GL.GetError() == ErrorCode.NoError;
             string vSource, fSource;
             int vShader, fShader;
-            
+
 
             /* read shader files */
 
@@ -165,15 +203,15 @@ namespace CityBattleDrones_Port
             program = GL.CreateProgram();
 
             ///* attach shaders to the program object */
-            
+
             GL.AttachShader(program, vShader);
             GL.AttachShader(program, fShader);
 
             ///* read shaders */
-            
+
             GL.ShaderSource(vShader, vSource);
             GL.ShaderSource(fShader, fSource);
-            
+
             ///* compile shaders */
 
             GL.CompileShader(vShader);
@@ -306,11 +344,35 @@ namespace CityBattleDrones_Port
             {
                 int x, y, n = 1;
                 string filename = texFiles[i];
+                var bitmap = Bitmap.FromFile(filename) as Bitmap;
+                //RenderHelpers.LoadTexture(bmp);
                 //unsigned char* data = stbi_load(filename, &x, &y, &n, 0);
 
-                //glBindTexture(GL_TEXTURE_2D, 2000 + i);
-                //  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                GL.BindTexture(TextureTarget.Texture2D, 2000 + i);
+                BitmapData data = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height),
+           ImageLockMode.ReadOnly, bitmap.PixelFormat);
+                var format = PixelInternalFormat.Rgba;
+                var format2 = OpenTK.Graphics.OpenGL.PixelFormat.Bgra;
+
+                var ps = System.Drawing.Image.GetPixelFormatSize(bitmap.PixelFormat);
+                if (ps == 32)
+                {
+                    n = 4;
+                }
+                else if (ps == 24)
+                {
+                    format = PixelInternalFormat.Rgb;
+                    format2 = OpenTK.Graphics.OpenGL.PixelFormat.Bgr;
+                    n = 3;
+                }
+                if (ps == 8)
+                {
+                    format = PixelInternalFormat.R8;
+                    format2 = OpenTK.Graphics.OpenGL.PixelFormat.Red;
+                }
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+
 
                 // ... process data if not NULL ...
                 // ... x = width, y = height, n = # 8-bit components per pixel ...
@@ -319,14 +381,22 @@ namespace CityBattleDrones_Port
                 if (n == 3)
                 {
                     //GL.TexImage2D(GL_TEXTURE_2D, 0, GL_RGB, x, y, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+                    GL.TexImage2D(TextureTarget.Texture2D, 0, format, data.Width, data.Height, 0,
+                format2, PixelType.UnsignedByte, data.Scan0);
                 }
                 else if (n == 4)
                 {
                     // GL.TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+                    GL.TexImage2D(TextureTarget.Texture2D, 0, format, data.Width, data.Height, 0,
+                format2, PixelType.UnsignedByte, data.Scan0);
                 }
+
+                bitmap.UnlockBits(data);
+                bitmap.Dispose();
                 //stbi_image_free(data);
             }
         }
+
         // Callback, called whenever GLUT determines that the window should be redisplayed
         // or glutPostRedisplay() has been called.
         void display()
@@ -430,17 +500,17 @@ namespace CityBattleDrones_Port
 
         void drawAssets()
         {
-            //GL.TexEnv(TextureEnvTarget.TextureEnv, TextureEnvParameter.TextureEnvMode, OpenTK.Graphics.OpenGL.All.Modulate);
+            GL.TexEnv(TextureEnvTarget.TextureEnv, TextureEnvParameter.TextureEnvMode, (int)OpenTK.Graphics.OpenGL.All.Modulate);
 
             Vector2d[] stCoordinates = new Vector2d[]{ new Vector2d(0, 0),
                 new Vector2d(0, 1), new Vector2d(1, 1), new Vector2d(1, 0)};
 
 
             // Set material properties of the streets
-            /*GL.Material(GL_FRONT, GL_AMBIENT, street_ambient);
-            GL.Material(GL_FRONT, GL_SPECULAR, street_specular);
-            GL.Material(GL_FRONT, GL_DIFFUSE, street_diffuse);
-            GL.Material(GL_FRONT, GL_SHININESS, street_shininess);*/
+            GL.Material(MaterialFace.Front, MaterialParameter.Ambient, street_ambient);
+            GL.Material(MaterialFace.Front, MaterialParameter.Specular, street_specular);
+            GL.Material(MaterialFace.Front, MaterialParameter.Diffuse, street_diffuse);
+            GL.Material(MaterialFace.Front, MaterialParameter.Shininess, street_shininess);
 
             for (int i = 0; i < streets.Count; i++)
             {
@@ -451,16 +521,16 @@ namespace CityBattleDrones_Port
             }
 
             //skybox
-            //glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
-            //glDisable(GL_CULL_FACE);
-            //glUniform1i(texModeLocation, 1);
+            GL.TexEnv(TextureEnvTarget.TextureEnv, TextureEnvParameter.TextureEnvMode, (int)OpenTK.Graphics.OpenGL.All.Decal);
+            GL.Disable(EnableCap.CullFace);
+            GL.Uniform1(texModeLocation, 1);
             GL.PushMatrix();
             GL.Translate(0, 0, 0);
             skybox.draw(2002, stSkySideCoords, stSkyTopCoords, stSkyBottomCoords);
             GL.PopMatrix();
-            //GL.Uniform1(texModeLocation, 0);
+            GL.Uniform1(texModeLocation, 0);
             //GL.TexEnv(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-            //GL.Enable(GL_CULL_FACE);
+            GL.Enable(EnableCap.CullFace);
             GL.CullFace(CullFaceMode.Back);
 
             // Set ground block material properties
@@ -700,7 +770,7 @@ namespace CityBattleDrones_Port
 
             GL.MatrixMode(MatrixMode.Modelview);
             GL.LoadIdentity();
-            pp = Matrix4d.LookAt(50, 50, 50, 0, 0, 0, 0, 1, 0);
+            pp = Matrix4d.LookAt(20, 20, 20, 0, 0, 0, 0, 1, 0);
             GL.LoadMatrix(ref pp);
 
             /////////
@@ -718,8 +788,13 @@ namespace CityBattleDrones_Port
             GL.End();
 
             GL.Disable(EnableCap.CullFace);
+            GL.Enable(EnableCap.Light0);
+            GL.Enable(EnableCap.Lighting);
 
-            //ground.draw();
+            Vector2d[] stCoordinates = new Vector2d[]{ new Vector2d(0, 0),
+                new Vector2d(0, 1), new Vector2d(1, 1), new Vector2d(1, 0)};
+            ground.draw(2000, stCoordinates, false);
+
             foreach (var item in buildings)
             {
                 item.draw();
